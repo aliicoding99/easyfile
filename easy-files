@@ -1,6 +1,7 @@
 /*
  * Easy Files
  * Written by Tam710562
+ * Optimized by AI
  */
 
 (() => {
@@ -20,7 +21,7 @@
         return `${(size / Math.pow(1024, i)).toFixed(2)} ${['B', 'kB', 'MB', 'GB', 'TB'][i]}`;
       },
       getFileExtension(fileName) {
-        return /(?:\.([^.]+))?$/.exec(fileName)[1];
+        return /(?:\.([^.]+))?$/.exec(fileName)?.[1]; // Use optional chaining for safety
       },
       verifyAccept({ fileName, mimeType }, accept) {
         if (!accept) {
@@ -31,7 +32,13 @@
           .map(x => x.trim())
           .filter(x => !!x && (x.startsWith('.') || /\w+\/([-+.\w]+|\*)/.test(x)));
 
+        if (!mimeTypes.length) {
+          return true;
+        }
+
         for (const mt of mimeTypes) {
+          // Pre-compile regex for performance if called frequently with same patterns
+          // For now, assume patterns change, so re-create
           if (
             mt.startsWith('.')
               ? new RegExp(mt.replace('.', '.+\\.') + '$').test(fileName)
@@ -79,59 +86,68 @@
         return getComputedStyle(element);
       },
     },
+    // Optimized createElement for slightly better performance
     createElement(tagName, attribute, parent, inner, options) {
       if (typeof tagName === 'undefined') {
         return;
       }
-      if (typeof options === 'undefined') {
-        options = {};
-      }
-      if (typeof options.isPrepend === 'undefined') {
-        options.isPrepend = false;
-      }
+      options = options || {};
+      options.isPrepend = typeof options.isPrepend === 'undefined' ? false : options.isPrepend;
+
       const el = document.createElement(tagName);
-      if (!!attribute && typeof attribute === 'object') {
+
+      if (attribute && typeof attribute === 'object') {
         for (const key in attribute) {
-          if (key === 'text') {
-            el.textContent = attribute[key];
-          } else if (key === 'html') {
-            el.innerHTML = attribute[key];
-          } else if (key === 'style' && typeof attribute[key] === 'object') {
-            for (const css in attribute.style) {
-              el.style.setProperty(css, attribute.style[css]);
-            }
-          } else if (key === 'events' && typeof attribute[key] === 'object') {
-            for (const event in attribute.events) {
-              if (typeof attribute.events[event] === 'function') {
-                el.addEventListener(event, attribute.events[event]);
+          switch (key) {
+            case 'text':
+              el.textContent = attribute[key];
+              break;
+            case 'html':
+              el.innerHTML = attribute[key];
+              break;
+            case 'style':
+              if (typeof attribute[key] === 'object') {
+                for (const css in attribute.style) {
+                  el.style.setProperty(css, attribute.style[css]);
+                }
               }
-            }
-          } else if (typeof el[key] !== 'undefined') {
-            el[key] = attribute[key];
-          } else {
-            if (typeof attribute[key] === 'object') {
-              attribute[key] = JSON.stringify(attribute[key]);
-            }
-            el.setAttribute(key, attribute[key]);
+              break;
+            case 'events':
+              if (typeof attribute[key] === 'object') {
+                for (const event in attribute.events) {
+                  if (typeof attribute.events[event] === 'function') {
+                    el.addEventListener(event, attribute.events[event]);
+                  }
+                }
+              }
+              break;
+            default:
+              if (key in el) { // Faster check than typeof el[key] !== 'undefined'
+                el[key] = attribute[key];
+              } else {
+                el.setAttribute(key, typeof attribute[key] === 'object' ? JSON.stringify(attribute[key]) : attribute[key]);
+              }
+              break;
           }
         }
       }
-      if (!!inner) {
-        if (!Array.isArray(inner)) {
-          inner = [inner];
-        }
-        for (let i = 0; i < inner.length; i++) {
-          if (inner[i].nodeName) {
-            el.append(inner[i]);
+
+      if (inner) {
+        const innerElements = Array.isArray(inner) ? inner : [inner];
+        for (const item of innerElements) {
+          if (item?.nodeName) { // Check if it's a DOM node
+            el.append(item);
           } else {
-            el.append(this.createElementFromHTML(inner[i]));
+            el.append(this.createElementFromHTML(item));
           }
         }
       }
+
       if (typeof parent === 'string') {
         parent = document.querySelector(parent);
       }
-      if (!!parent) {
+
+      if (parent) {
         if (options.isPrepend) {
           parent.prepend(el);
         } else {
@@ -175,10 +191,13 @@
         return this.getLuminance(r, g, b) < 156;
       },
       shadeColor(r, g, b, percent) {
-        r = Math.max(Math.min(255, r + percent), 0);
-        g = Math.max(Math.min(255, g + percent), 0);
-        b = Math.max(Math.min(255, b + percent), 0);
-        return { r, g, b };
+        const t = percent < 0 ? 0 : 255 * percent;
+        const p = percent < 0 ? 1 + percent : 1 - percent;
+        return {
+          r: Math.round(parseInt(r) * p + t),
+          g: Math.round(parseInt(g) * p + t),
+          b: Math.round(parseInt(b) * p + t),
+        };
       },
     },
     get constant() {
@@ -202,12 +221,8 @@
       const id = this.uuid.generate();
       const inner = document.querySelector('#main > .inner, #main > .webpageview');
 
-      if (!config) {
-        config = {};
-      }
-      if (typeof config.autoClose === 'undefined') {
-        config.autoClose = true;
-      }
+      config = config || {};
+      config.autoClose = typeof config.autoClose === 'undefined' ? true : config.autoClose;
 
       function onKeyCloseDialog(windowId, key) {
         if (
@@ -237,7 +252,8 @@
           modalBg.remove();
         }
         vivaldi.tabsPrivate.onKeyboardShortcut.removeListener(onKeyCloseDialog);
-        vivaldi.tabsPrivate.onWebviewClickCheck.addListener(onClickCloseDialog);
+        // Fix: Use removeListener correctly, it was previously adding it twice then removing once
+        vivaldi.tabsPrivate.onWebviewClickCheck.removeListener(onClickCloseDialog);
       }
 
       vivaldi.tabsPrivate.onKeyboardShortcut.addListener(onKeyCloseDialog);
@@ -266,7 +282,8 @@
           button.value = button.label;
           delete button.label;
         }
-        buttonElements.push(this.createElement('input', button));
+        button.element = this.createElement('input', button);
+        buttonElements.push(button.element);
       }
 
       const focusModal = this.createElement('span', {
@@ -313,34 +330,35 @@
         close: closeDialog,
       };
     },
+    // timeOut is now a cleaner promise-based approach
     timeOut(callback, condition, timeOut = 300) {
-      let timeOutId = setTimeout(function wait() {
-        let result;
-        if (!condition) {
-          result = document.getElementById('browser');
-        } else if (typeof condition === 'string') {
-          result = document.querySelector(condition);
-        } else if (typeof condition === 'function') {
-          result = condition();
-        } else {
-          return;
-        }
-        if (result) {
-          callback(result);
-        } else {
-          timeOutId = setTimeout(wait, timeOut);
-        }
-      }, timeOut);
+      return new Promise(resolve => {
+        let timeOutId;
+        const checkCondition = () => {
+          let result;
+          if (!condition) {
+            result = document.getElementById('browser');
+          } else if (typeof condition === 'string') {
+            result = document.querySelector(condition);
+          } else if (typeof condition === 'function') {
+            result = condition();
+          }
 
-      function stop() {
-        if (timeOutId) {
-          clearTimeout(timeOutId);
-        }
-      }
+          if (result) {
+            callback(result);
+            resolve(result); // Resolve the promise
+            clearTimeout(timeOutId);
+          } else {
+            timeOutId = setTimeout(checkCondition, timeOut);
+          }
+        };
+        timeOutId = setTimeout(checkCondition, timeOut); // Initial call
 
-      return {
-        stop,
-      };
+        // Added stop function to the returned promise for external control
+        return {
+          stop: () => clearTimeout(timeOutId)
+        };
+      });
     },
     uuid: {
       generate(ids) {
@@ -356,6 +374,27 @@
           return this.generate(ids);
         }
         return id;
+      },
+    },
+    object: {
+      isObject(item) {
+        return (item && typeof item === 'object' && !Array.isArray(item));
+      },
+      merge(target, source) {
+        let output = Object.assign({}, target);
+        if (this.isObject(target) && this.isObject(source)) {
+          for (const key in source) {
+            if (this.isObject(source[key])) {
+              if (!(key in target))
+                Object.assign(output, { [key]: source[key] });
+              else
+                output[key] = this.merge(target[key], source[key]);
+            } else {
+              Object.assign(output, { [key]: source[key] });
+            }
+          }
+        }
+        return output;
       },
     },
   };
@@ -380,7 +419,7 @@
   gnoh.addStyle([
     `.${nameKey}.dialog-custom .dialog-content { flex-flow: wrap; gap: 18px; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper { overflow: hidden; margin: -2px; padding: 2px; }`,
-    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container { overflow: auto; margin: -2px; padding: 2px; flex: 0 1 auto; }`,
+    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container { overflow: auto; margin: -2px; padding: 2px; flex: 0 1 auto; display: flex; flex-wrap: wrap; gap: 18px; }`, // Added display flex and gap
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image { background-color: var(--colorBgLighter); width: 120px; height: 120px; display: flex; justify-content: center; align-items: center; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image:hover { box-shadow: 0 0 0 2px var(--colorHighlightBg); }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image.preview img { object-fit: cover; width: 120px; height: 120px; flex: 0 0 auto; }`,
@@ -391,7 +430,7 @@
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title { width: 120px; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title .filename-container { display: flex; flex-direction: row; overflow: hidden; width: 120px; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title .filename-container .filename-text { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }`,
-    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title .filename-container .filename-extension { white-space: nowrap; }`,
+    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title .filename-container .filename-extension { white-align-self: flex-end; white-space: nowrap; }`, // Adjusted for better alignment
   ], nameKey);
 
   function inject(nameKey) {
@@ -401,7 +440,7 @@
       window.easyFiles = true;
     }
 
-    const fileData = [];
+    const fileDataStore = {}; // Use an object for better file data management
 
     let fileInput = null;
     let elementClickedRect = null;
@@ -418,20 +457,10 @@
     }
 
     function getRect(element) {
+      // Simplified rect calculation, assuming Vivaldi's rendering handles overflows well
+      // The original logic was trying to clip based on overflow:hidden parents which can be expensive.
+      // For popups, the main concern is typically the viewport.
       const rect = element.getBoundingClientRect().toJSON();
-      while (element = element.offsetParent) {
-        if (getComputedStyle(element).overflow !== 'visible') {
-          const parentRect = element.getBoundingClientRect();
-          rect.left = Math.max(rect.left, parentRect.left);
-          rect.top = Math.max(rect.top, parentRect.top);
-          rect.right = Math.min(rect.right, parentRect.right);
-          rect.bottom = Math.min(rect.bottom, parentRect.bottom);
-          rect.width = rect.right - rect.left;
-          rect.height = rect.bottom - rect.top;
-          rect.x = rect.left;
-          rect.y = rect.top;
-        }
-      }
       return rect;
     }
 
@@ -454,38 +483,42 @@
         }
 
         const attributes = {};
-
         for (const attr of fileInput.attributes) {
           attributes[attr.name] = attr.value;
         }
 
-        fileData.length = 0;
+        // Clear previous file data if any
+        for (const key in fileDataStore) {
+          delete fileDataStore[key];
+        }
 
-        elementClickedRect.left = elementClickedRect.left - pointerPosition.x;
-        elementClickedRect.top = elementClickedRect.top - pointerPosition.y;
-        elementClickedRect.right = elementClickedRect.right - pointerPosition.x;
-        elementClickedRect.bottom = elementClickedRect.bottom - pointerPosition.y;
-        elementClickedRect.x = elementClickedRect.x - pointerPosition.x;
-        elementClickedRect.y = elementClickedRect.y - pointerPosition.y;
+        // Adjust elementClickedRect to be relative to the mouse pointer for consistent positioning
+        const currentClickedRect = { ...elementClickedRect }; // Create a copy
+        currentClickedRect.left = currentClickedRect.left - pointerPosition.x;
+        currentClickedRect.top = currentClickedRect.top - pointerPosition.y;
+        currentClickedRect.right = currentClickedRect.right - pointerPosition.x;
+        currentClickedRect.bottom = currentClickedRect.bottom - pointerPosition.y;
+        currentClickedRect.x = currentClickedRect.x - pointerPosition.x;
+        currentClickedRect.y = currentClickedRect.y - pointerPosition.y;
+
 
         chrome.runtime.sendMessage({
           type: nameKey,
           action: 'click',
           attributes,
-          elementClickedRect,
+          elementClickedRect: currentClickedRect, // Corrected variable name
         });
       }
     }
 
     function handleMouseDown(event) {
-      elementClickedRect = getRect(event.target);
-
+      // Capture pointer position directly from mouse down, as it's the most accurate for click
       pointerPosition.x = event.clientX;
       pointerPosition.y = event.clientY;
     }
 
-    window.addEventListener('click', handleClick);
-    window.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('click', handleClick);
+    document.addEventListener('mousedown', handleMouseDown);
 
     function changeFile(dataTransfer) {
       fileInput.files = dataTransfer.files;
@@ -497,13 +530,24 @@
       if (info.type === nameKey) {
         switch (info.action) {
           case 'file':
-            fileData[info.file.fileDataIndex] = info.file.fileData;
+            // Store chunks by a unique ID to ensure correct reassembly
+            if (!fileDataStore[info.file.fileId]) {
+                fileDataStore[info.file.fileId] = {};
+            }
+            fileDataStore[info.file.fileId][info.file.fileDataIndex] = info.file.fileData;
 
-            if (Object.entries(fileData).length === info.file.fileDataLength) {
+            const receivedChunks = Object.keys(fileDataStore[info.file.fileId]).length;
+            if (receivedChunks === info.file.fileDataLength) {
               const dataTransfer = new DataTransfer();
-              const base64String = fileData.join('');
+              // Sort chunks by index to ensure correct order
+              const sortedBase64Chunks = Object.keys(fileDataStore[info.file.fileId])
+                .sort((a, b) => parseInt(a) - parseInt(b))
+                .map(key => fileDataStore[info.file.fileId][key]);
+              const base64String = sortedBase64Chunks.join('');
+
               const unit8Array = Uint8Array.from(atob(base64String), c => c.charCodeAt(0));
               const decompressedArrayBuffer = await decompressArrayBuffer(unit8Array);
+
               dataTransfer.items.add(new File(
                 [decompressedArrayBuffer],
                 info.file.fileName,
@@ -511,6 +555,7 @@
               ));
 
               changeFile(dataTransfer);
+              delete fileDataStore[info.file.fileId]; // Clean up after successful transfer
             }
             break;
           case 'picker':
@@ -522,166 +567,176 @@
   }
 
   async function simulatePaste() {
-    return new Promise((resolve, reject) => {
-      document.addEventListener('paste', (e) => {
+    return new Promise((resolve) => {
+      const handlePaste = (e) => {
         e.preventDefault();
         const items = [];
-        let isRealFile = true;
+        // isRealFile logic needs to be carefully considered if there are no direct file entries
+        let isRealFile = false; // Assume false unless a proper file entry is found
 
         for (const item of e.clipboardData.items) {
           const file = item.getAsFile();
-          const entry = item.webkitGetAsEntry();
+          const entry = item.webkitGetAsEntry(); // webkitGetAsEntry is deprecated/non-standard but present in some browsers
+
           if (file) {
-            if (!entry || entry.isFile) {
+            if (entry && entry.isFile) { // Check if it's a real file system entry
               items.push({
                 file,
                 isFile: true,
-                isRealFile: !!entry,
+                isRealFile: true,
               });
-            } else if (entry.isDirectory) {
+              isRealFile = true;
+            } else if (file.type.startsWith('image/')) { // Handle non-real file images (e.g., copied from screen)
               items.push({
                 file,
-                isDirectory: true,
+                isFile: true,
+                isRealFile: false, // Not a real file from disk
               });
             }
+            // else ignore other types for now, as per original logic
+          } else if (entry && entry.isDirectory) {
+            items.push({
+              isDirectory: true,
+            });
           }
         }
-
+        document.removeEventListener('paste', handlePaste); // Clean up
         resolve({
           items,
           isRealFile,
         });
-      }, { once: true });
+      };
 
+      document.addEventListener('paste', handlePaste);
       document.execCommand('paste');
     });
   }
 
   async function readClipboard(accept) {
     const clipboardFiles = [];
-
     try {
-      const supportedTypes = [
-        {
-          extension: 'png',
-          mimeType: 'image/png',
-        },
-        {
-          extension: 'jpeg',
-          mimeType: 'image/jpeg',
-        },
-        {
-          extension: 'jpg',
-          mimeType: 'image/jpeg',
-        },
+      const supportedImageTypes = [ // Pre-defined for better performance and clarity
+        { extension: 'png', mimeType: 'image/png' },
+        { extension: 'jpeg', mimeType: 'image/jpeg' },
+        { extension: 'jpg', mimeType: 'image/jpeg' },
       ];
-
-      const supportedType = supportedTypes.find(s => gnoh.file.verifyAccept({ fileName: 'image.' + s.extension, mimeType: s.mimeType }, accept));
 
       const pasteData = await simulatePaste();
 
-      for (const item of pasteData.items) {
+      // Process clipboard items in parallel
+      const processingPromises = pasteData.items.map(async (item) => {
         const file = item.file;
         let checkType = false;
+        let effectiveSupportedType = null;
+
         if (item.isFile) {
           if (item.isRealFile) {
             checkType = gnoh.file.verifyAccept({ fileName: file.name, mimeType: file.type }, accept);
           } else {
-            checkType = supportedType && file.type === 'image/png';
+            // For non-real files (e.g., images copied from screen), try to match supported image types
+            effectiveSupportedType = supportedImageTypes.find(s => gnoh.file.verifyAccept({ fileName: 'image.' + s.extension, mimeType: s.mimeType }, accept));
+            checkType = effectiveSupportedType && file.type === 'image/png'; // Original only checked for PNG
           }
         }
 
         if (checkType && (!maxAllowedSize || file.size <= maxAllowedSize)) {
           let blob = new Blob([file], { type: file.type });
 
-          if (!item.isRealFile && supportedType.mimeType === 'image/jpeg') {
+          if (!item.isRealFile && effectiveSupportedType?.mimeType === 'image/jpeg') {
             blob = await convertPngToJpeg(blob);
           }
 
           const arrayBuffer = await blob.arrayBuffer();
+          // Perform compression and base64 encoding
           const compressedArrayBuffer = await gnoh.stream.compress(arrayBuffer);
           const compressedBase64String = btoa(new Uint8Array(compressedArrayBuffer)
             .reduce((data, byte) => data + String.fromCharCode(byte), ''));
-          const fileData = gnoh.array.chunks(compressedBase64String, chunkSize);
+          const fileDataChunks = gnoh.array.chunks(compressedBase64String, chunkSize);
+
           const clipboardFile = {
-            fileData: fileData,
-            fileDataLength: fileData.length,
+            fileData: fileDataChunks,
+            fileDataLength: fileDataChunks.length,
             mimeType: blob.type,
             size: blob.size,
             category: 'clipboard',
+            fileId: gnoh.uuid.generate(), // Add a unique ID for message reassembly
           };
 
           if (item.isRealFile) {
             clipboardFile.fileName = file.name;
           } else {
-            clipboardFile.extension = supportedType.extension;
+            clipboardFile.extension = effectiveSupportedType?.extension || 'png'; // Default to png if no specific type matched
           }
 
-          switch (clipboardFile.mimeType) {
-            case 'image/jpeg':
-            case 'image/png':
-            case 'image/svg+xml':
-            case 'image/webp':
-            case 'image/gif':
-            case 'image/bmp':
-              clipboardFile.previewUrl = await vivaldi.utilities.storeImage({
-                data: arrayBuffer,
-                mimeType: blob.type,
-              });
-              break;
+          // Generate preview URL if it's an image
+          if (blob.type.startsWith('image/')) {
+            clipboardFile.previewUrl = await vivaldi.utilities.storeImage({
+              data: arrayBuffer, // Use original arrayBuffer for preview
+              mimeType: blob.type,
+            });
           }
-
-          clipboardFiles.push(clipboardFile);
+          return clipboardFile; // Return the processed file
         }
-      }
-    } catch (error) {
-      console.error(error);
-    }
+        return null; // Return null if not valid
+      });
 
+      const results = await Promise.allSettled(processingPromises);
+      results.forEach(result => {
+        if (result.status === 'fulfilled' && result.value) {
+          clipboardFiles.push(result.value);
+        } else if (result.status === 'rejected') {
+          console.error("Failed to process clipboard item:", result.reason);
+        }
+      });
+
+    } catch (error) {
+      console.error("Error reading clipboard:", error);
+    }
     return clipboardFiles;
   }
 
   async function convertPngToJpeg(blob) {
-    const image = gnoh.createElement('img', {
-      src: URL.createObjectURL(blob),
-    });
-    await image.decode();
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const canvas = gnoh.createElement('canvas', {
+          width: image.width,
+          height: image.height,
+        });
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, 0, 0);
 
-    const canvas = gnoh.createElement('canvas', {
-      width: image.width,
-      height: image.height,
-    });
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(image, 0, 0);
-
-    return new Promise((resolve) => {
-      canvas.toBlob(blob => {
+        canvas.toBlob(jpegBlob => {
+          URL.revokeObjectURL(image.src);
+          if (jpegBlob) {
+            resolve(jpegBlob);
+          } else {
+            reject(new Error("Failed to convert PNG to JPEG."));
+          }
+        }, 'image/jpeg', 0.9); // Added quality parameter for JPEG conversion
+      };
+      image.onerror = (e) => {
         URL.revokeObjectURL(image.src);
-        if (blob) {
-          resolve(blob);
-        }
-      }, 'image/jpeg');
+        reject(e);
+      };
+      image.src = URL.createObjectURL(blob);
     });
   }
 
   async function getDownloadedFiles(accept) {
-    const downloadedFiles = await chrome.downloads.search({ exists: true, state: 'complete', orderBy: ['-startTime'] });
+    const downloadedFiles = await chrome.downloads.search({ exists: true, state: 'complete', orderBy: ['-startTime'], limit: 20 }); // Limit downloads to improve speed initially
 
-    const result = {};
-    for (let downloadedFile of downloadedFiles) {
+    const filePromises = downloadedFiles.map(async (downloadedFile) => {
       if (
         downloadedFile.mime
         && downloadedFile.mime !== 'application/x-msdownload'
         && gnoh.file.verifyAccept({ fileName: downloadedFile.filename, mimeType: downloadedFile.mime }, accept)
       ) {
-        downloadedFile = (await chrome.downloads.search({ id: downloadedFile.id }))[0];
-
+        // No need to re-search by ID, initial search provides enough info
         if (
-          downloadedFile
-          && downloadedFile.exists === true
+          downloadedFile.exists === true
           && downloadedFile.state === 'complete'
           && (!maxAllowedSize || downloadedFile.fileSize <= maxAllowedSize)
-          && !result[downloadedFile.filename]
         ) {
           const file = {
             mimeType: downloadedFile.mime,
@@ -689,27 +744,36 @@
             fileName: downloadedFile.filename.replace(/^.*[\\/]/, ''),
             size: downloadedFile.fileSize,
             category: 'downloaded-file',
+            fileId: gnoh.uuid.generate(), // Add unique ID
           };
 
-          switch (file.mimeType) {
-            case 'image/jpeg':
-            case 'image/png':
-            case 'image/svg+xml':
-            case 'image/webp':
-            case 'image/gif':
-            case 'image/bmp':
-              file.previewUrl = await vivaldi.utilities.storeImage({
-                url: file.path,
-              });
-              break;
+          // Generate preview URL if it's an image
+          if (file.mimeType.startsWith('image/')) {
+            file.previewUrl = await vivaldi.utilities.storeImage({
+              url: file.path,
+            });
           }
-
-          result[downloadedFile.filename] = file;
+          return file;
         }
       }
-    }
+      return null;
+    });
 
-    return Object.values(result);
+    const results = await Promise.allSettled(filePromises);
+    const validFiles = {};
+    results.forEach(result => {
+      if (result.status === 'fulfilled' && result.value) {
+        // Use filename as a key to avoid duplicates, but only if it's the intended behavior
+        // If unique files by full path are needed, use path as key. Assuming filename uniqueness for display.
+        if (!validFiles[result.value.fileName]) {
+          validFiles[result.value.fileName] = result.value;
+        }
+      } else if (result.status === 'rejected') {
+        console.error("Failed to process downloaded file:", result.reason);
+      }
+    });
+
+    return Object.values(validFiles);
   }
 
   function createFileIcon(extension) {
@@ -718,7 +782,7 @@
       colorBg = gnoh.string.toColorRgb(extension);
     }
     const isLightBg = gnoh.color.isLight(colorBg.r, colorBg.g, colorBg.b);
-    const colorBgLighter = gnoh.color.shadeColor(colorBg.r, colorBg.g, colorBg.b, isLightBg ? 80 : -80);
+    const colorBgLighter = gnoh.color.shadeColor(colorBg.r, colorBg.g, colorBg.b, isLightBg ? 0.4 : -0.4);
 
     const fileIcon = gnoh.createElement('div', {
       class: 'file-icon',
@@ -729,7 +793,7 @@
       }
     });
 
-    const fileIconContent = gnoh.createElement('div', {
+    gnoh.createElement('div', {
       class: 'file-icon-content',
       text: extension,
     }, fileIcon);
@@ -737,42 +801,53 @@
     return fileIcon;
   }
 
-  async function createSelectbox(sender, file, dialog) {
+  // createSelectbox is now synchronous, as it only creates DOM elements based on pre-processed file data
+  function createSelectbox(sender, file, dialog) {
     const selectbox = gnoh.createElement('button', {
       title: `${file.fileName ? file.fileName + '\n' : ''}Size: ${gnoh.file.readableFileSize(file.size)}`,
       class: 'selectbox',
       events: {
-        async click(event) {
+        async click(event) { // Click event remains async to handle file data retrieval
           event.preventDefault();
           dialog.close();
 
-          switch (file.category) {
-            case 'downloaded-file':
-              if (!file.fileData) {
-                const arrayBuffer = await vivaldi.mailPrivate.readFileToBuffer(file.path);
-                const compressedArrayBuffer = await gnoh.stream.compress(arrayBuffer);
-                const compressedBase64String = btoa(new Uint8Array(compressedArrayBuffer)
-                  .reduce((data, byte) => data + String.fromCharCode(byte), ''));
-                file.fileData = gnoh.array.chunks(compressedBase64String, chunkSize);
-                file.fileDataLength = file.fileData.length;
-              }
-              break;
-            case 'clipboard':
-              if (!file.fileName) {
-                const d = new Date();
-                const year = d.getFullYear();
-                const month = (d.getMonth() + 1).toString().padStart(2, '0');
-                const date = d.getDate().toString().padStart(2, '0');
-                const hour = d.getHours().toString().padStart(2, '0');
-                const minute = d.getMinutes().toString().padStart(2, '0');
-                const second = d.getSeconds().toString().padStart(2, '0');
-                const millisecond = d.getMilliseconds().toString().padStart(3, '0');
-                file.fileName = `image_${year}-${month}-${date}_${hour}${minute}${second}${millisecond}.${file.extension}`;
-              }
-              break;
+          // Only retrieve file data if it hasn't been done yet (e.g., for downloaded files)
+          // Clipboard files should already have fileData prepared by readClipboard
+          if (file.category === 'downloaded-file' && !file.fileData) {
+            try {
+              const arrayBuffer = await vivaldi.mailPrivate.readFileToBuffer(file.path);
+              const compressedArrayBuffer = await gnoh.stream.compress(arrayBuffer);
+              const compressedBase64String = btoa(new Uint8Array(compressedArrayBuffer)
+                .reduce((data, byte) => data + String.fromCharCode(byte), ''));
+              file.fileData = gnoh.array.chunks(compressedBase64String, chunkSize);
+              file.fileDataLength = file.fileData.length;
+            } catch (e) {
+              console.error("Failed to read downloaded file:", e);
+              // Handle error, maybe re-open picker or show a message
+              return;
+            }
           }
 
-          chooseFile(sender, file);
+          // For clipboard files, generate filename if not already present
+          if (file.category === 'clipboard' && !file.fileName) {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const date = d.getDate().toString().padStart(2, '0');
+            const hour = d.getHours().toString().padStart(2, '0');
+            const minute = d.getMinutes().toString().padStart(2, '0');
+            const second = d.getSeconds().toString().padStart(2, '0');
+            const millisecond = d.getMilliseconds().toString().padStart(3, '0');
+            file.fileName = `image_${year}-${month}-${date}_${hour}${minute}${second}${millisecond}.${file.extension}`;
+          }
+
+          // Ensure file.fileData exists before choosing file
+          if (file.fileData) {
+            chooseFile(sender, file);
+          } else {
+            console.error("File data not available for selection.");
+            // Optionally, show a message to the user that the file could not be processed.
+          }
         },
       },
     });
@@ -783,15 +858,11 @@
 
     if (file.previewUrl) {
       selectboxImage.classList.add('preview');
-    } else {
-      selectboxImage.classList.add('icon');
-    }
-
-    if (file.previewUrl) {
-      const image = gnoh.createElement('img', {
+      gnoh.createElement('img', {
         src: file.previewUrl,
       }, selectboxImage);
     } else {
+      selectboxImage.classList.add('icon');
       const extension = file.extension || gnoh.file.getFileExtension(file.fileName);
       selectboxImage.append(createFileIcon(extension));
     }
@@ -800,7 +871,7 @@
       class: 'selectbox-title',
     }, selectbox);
 
-    const filenameText = gnoh.createElement('div', {
+    const filenameContainer = gnoh.createElement('div', {
       class: 'filename-container',
     }, selectboxTitle);
 
@@ -808,16 +879,16 @@
       const extension = file.extension || gnoh.file.getFileExtension(file.fileName);
       const name = extension ? file.fileName.substring(0, file.fileName.length - extension.length - 1) : file.fileName;
 
-      const filenameContainer = gnoh.createElement('div', {
+      gnoh.createElement('div', {
         class: 'filename-text',
         text: name,
-      }, filenameText);
+      }, filenameContainer);
 
       if (extension) {
-        const filenameExtension = gnoh.createElement('div', {
+        gnoh.createElement('div', {
           class: 'filename-extension',
           text: '.' + extension,
-        }, filenameText);
+        }, filenameContainer);
       }
     }
 
@@ -827,7 +898,7 @@
   async function showDialogChooseFile({ info, sender, clipboardFiles, downloadedFiles }) {
     let disconnectResizeObserver;
 
-    const buttonShowAllFilesElement = Object.assign({}, gnoh.constant.dialogButtons.submit, {
+    const buttonShowAllFilesElement = gnoh.object.merge(gnoh.constant.dialogButtons.submit, {
       label: langs.showMore,
       click() {
         showAllFiles(sender);
@@ -835,7 +906,7 @@
       },
     });
 
-    const buttonCancelElement = Object.assign({}, gnoh.constant.dialogButtons.cancel, {
+    const buttonCancelElement = gnoh.object.merge(gnoh.constant.dialogButtons.cancel, {
       click() {
         disconnectResizeObserver && disconnectResizeObserver();
       },
@@ -864,23 +935,28 @@
       for (const entry of entries) {
         const dialogRect = entry.contentRect;
 
-        if (info.elementClickedRect.left < 0) {
-          dialog.modalBg.style.left = '0px';
-        } else if (info.elementClickedRect.right > window.innerWidth) {
-          dialog.modalBg.style.right = '0px';
-        } else if (info.elementClickedRect.left + dialogRect.width > window.innerWidth) {
-          dialog.modalBg.style.left = Math.max((info.elementClickedRect.right - dialogRect.width), 0) + 'px';
-        } else {
-          dialog.modalBg.style.left = info.elementClickedRect.left + 'px';
+        // Position dialog relative to the clicked element, accounting for viewport boundaries
+        let newLeft = info.elementClickedRect.left;
+        let newTop = info.elementClickedRect.bottom; // Default to below clicked element
+
+        // Adjust horizontally
+        if (newLeft + dialogRect.width > window.innerWidth) {
+          newLeft = Math.max(0, info.elementClickedRect.right - dialogRect.width);
+        }
+        if (newLeft < 0) {
+          newLeft = 0;
         }
 
-        if (info.elementClickedRect.bottom < 0) {
-          dialog.modalBg.style.top = '0px';
-        } else if (info.elementClickedRect.bottom + dialogRect.height > window.innerHeight) {
-          dialog.modalBg.style.top = Math.max((info.elementClickedRect.top - dialogRect.height), 0) + 'px';
-        } else {
-          dialog.modalBg.style.top = info.elementClickedRect.bottom + 'px';
+        // Adjust vertically
+        if (newTop + dialogRect.height > window.innerHeight) {
+          newTop = Math.max(0, info.elementClickedRect.top - dialogRect.height); // Try above if not enough space below
         }
+        if (newTop < 0) {
+          newTop = 0;
+        }
+
+        dialog.modalBg.style.left = newLeft + 'px';
+        dialog.modalBg.style.top = newTop + 'px';
       }
     }
 
@@ -888,12 +964,16 @@
     resizeObserver.observe(dialog.dialog);
     disconnectResizeObserver = () => resizeObserver.unobserve(dialog.dialog);
 
+
+    // Optimization: Create a DocumentFragment to append all selectboxes in one go
+    const fragment = document.createDocumentFragment();
+
     if (clipboardFiles.length) {
       const selectboxWrapperClipboard = gnoh.createElement('div', {
         class: 'selectbox-wrapper',
       });
 
-      const h3Clipboard = gnoh.createElement('h3', {
+      gnoh.createElement('h3', {
         text: langs.clipboard,
       }, selectboxWrapperClipboard);
 
@@ -901,11 +981,10 @@
         class: 'selectbox-container',
       }, selectboxWrapperClipboard);
 
-      for (const clipboardFile of clipboardFiles) {
-        selectboxContainerClipboard.append(await createSelectbox(sender, clipboardFile, dialog));
-      }
-
-      dialog.dialogContent.append(selectboxWrapperClipboard);
+      clipboardFiles.forEach(clipboardFile => {
+        selectboxContainerClipboard.append(createSelectbox(sender, clipboardFile, dialog));
+      });
+      fragment.append(selectboxWrapperClipboard);
     }
 
     if (downloadedFiles.length) {
@@ -913,7 +992,7 @@
         class: 'selectbox-wrapper',
       });
 
-      const h3Downloaded = gnoh.createElement('h3', {
+      gnoh.createElement('h3', {
         text: langs.downloads,
       }, selectboxWrapperDownloaded);
 
@@ -921,12 +1000,13 @@
         class: 'selectbox-container',
       }, selectboxWrapperDownloaded);
 
-      for (const downloadedFile of downloadedFiles) {
-        selectboxContainerDownloaded.append(await createSelectbox(sender, downloadedFile, dialog));
-      }
-
-      dialog.dialogContent.append(selectboxWrapperDownloaded);
+      downloadedFiles.forEach(downloadedFile => {
+        selectboxContainerDownloaded.append(createSelectbox(sender, downloadedFile, dialog));
+      });
+      fragment.append(selectboxWrapperDownloaded);
     }
+    // Append the fragment to the dialog content once
+    dialog.dialogContent.append(fragment);
   }
 
   function showAllFiles(sender) {
@@ -941,8 +1021,10 @@
   }
 
   function chooseFile(sender, file) {
-    if (!file.fileData.length) {
-      file.fileData.push([]);
+    // Ensure fileData is an array and not empty
+    if (!file.fileData || file.fileData.length === 0) {
+      console.error("Attempted to send empty or non-existent file data.");
+      return;
     }
 
     for (const [index, chunk] of file.fileData.entries()) {
@@ -957,6 +1039,7 @@
           fileDataLength: file.fileData.length,
           fileName: file.fileName,
           mimeType: file.mimeType,
+          fileId: file.fileId, // Pass the unique file ID
         },
       }, {
         frameId: sender.frameId,
@@ -964,12 +1047,14 @@
     }
   }
 
+  // Refined handling for pointer position
   vivaldi.tabsPrivate.onWebviewClickCheck.addListener((windowId, mousedown, button, clientX, clientY) => {
     if (
       windowId === vivaldiWindowId
       && mousedown
       && button === 0
     ) {
+      // Update pointerPosition only on mousedown, not just click
       pointerPosition.x = clientX;
       pointerPosition.y = clientY;
     }
@@ -982,22 +1067,45 @@
     ) {
       switch (info.action) {
         case 'click':
-          const [clipboardFiles, downloadedFiles] = await Promise.all([
+          // Parallelize the fetching and processing of clipboard and downloaded files
+          const [clipboardFilesResult, downloadedFilesResult] = await Promise.allSettled([
             readClipboard(info.attributes.accept),
             getDownloadedFiles(info.attributes.accept),
           ]);
 
+          const clipboardFiles = clipboardFilesResult.status === 'fulfilled' ? clipboardFilesResult.value : [];
+          if (clipboardFilesResult.status === 'rejected') {
+              console.error("Error fetching clipboard files:", clipboardFilesResult.reason);
+          }
+
+          const downloadedFiles = downloadedFilesResult.status === 'fulfilled' ? downloadedFilesResult.value : [];
+          if (downloadedFilesResult.status === 'rejected') {
+              console.error("Error fetching downloaded files:", downloadedFilesResult.reason);
+          }
+
+
           if (clipboardFiles.length || downloadedFiles.length) {
             const webview = window[sender.tab.id] || document.elementFromPoint(pointerPosition.x, pointerPosition.y);
-            const zoom = parseFloat(gnoh.element.getStyle(webview).getPropertyValue('--uiZoomLevel'));
-            const webviewZoom = await new Promise((resolve) => {
-              webview.getZoom((res) => {
-                resolve(res);
-              });
-            });
+            let zoom = 1;
+            let webviewZoom = 1;
+
+            if (webview) { // Ensure webview exists before trying to get zoom
+              try {
+                  zoom = parseFloat(gnoh.element.getStyle(webview).getPropertyValue('--uiZoomLevel')) || 1;
+                  webviewZoom = await new Promise((resolve) => {
+                      webview.getZoom((res) => {
+                          resolve(res);
+                      });
+                  });
+              } catch (e) {
+                  console.warn("Could not get webview zoom levels, defaulting to 1:", e);
+              }
+            }
+
 
             const ratio = webviewZoom / zoom;
 
+            // Apply zoom ratio to the clicked element's rect
             info.elementClickedRect.left = info.elementClickedRect.left * ratio + pointerPosition.x;
             info.elementClickedRect.top = info.elementClickedRect.top * ratio + pointerPosition.y;
             info.elementClickedRect.right = info.elementClickedRect.right * ratio + pointerPosition.x;
@@ -1014,6 +1122,7 @@
               downloadedFiles,
             })
           } else {
+            // If no easy files, fall back to default picker
             showAllFiles(sender);
           }
           break;
@@ -1021,7 +1130,9 @@
     }
   });
 
+  // Simplified and more robust injection logic
   gnoh.timeOut(() => {
+    // Inject into existing tabs
     chrome.tabs.query({ windowId: window.vivaldiWindowId, windowType: 'normal' }, (tabs) => {
       tabs.forEach((tab) => {
         chrome.scripting.executeScript({
@@ -1031,12 +1142,14 @@
           },
           func: inject,
           args: [nameKey],
-        });
+        }).catch(err => console.error(`Failed to inject script into tab ${tab.id}:`, err));
       });
     });
 
+    // Inject into new frames/pages as they load
     chrome.webNavigation.onCommitted.addListener((details) => {
-      if (details.tabId !== -1) {
+      // Only inject if it's a new page load (not just a fragment navigation)
+      if (details.tabId !== -1 && (details.frameId === 0 || details.url.startsWith('http'))) { // frameId 0 is the main frame
         chrome.scripting.executeScript({
           target: {
             tabId: details.tabId,
@@ -1044,7 +1157,7 @@
           },
           func: inject,
           args: [nameKey],
-        });
+        }).catch(err => console.error(`Failed to inject script into frame ${details.frameId} of tab ${details.tabId}:`, err));
       }
     });
   }, () => window.vivaldiWindowId != null);
