@@ -409,7 +409,7 @@
   };
 
   const chunkSize = 1024 * 1024 * 10; // 10MB
-  const maxAllowedSize = 1024 * 1024 * 5; // 5MB
+  // const maxAllowedSize = 1024 * 1024 * 5; // 5MB - Removed for testing purposes
 
   const pointerPosition = {
     x: 0,
@@ -419,18 +419,32 @@
   gnoh.addStyle([
     `.${nameKey}.dialog-custom .dialog-content { flex-flow: wrap; gap: 18px; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper { overflow: hidden; margin: -2px; padding: 2px; }`,
-    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container { overflow: auto; margin: -2px; padding: 2px; flex: 0 1 auto; display: flex; flex-wrap: wrap; gap: 18px; }`, // Added display flex and gap
+    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container { overflow: auto; margin: -2px; padding: 2px; flex: 0 1 auto; display: flex; flex-wrap: wrap; gap: 18px; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image { background-color: var(--colorBgLighter); width: 120px; height: 120px; display: flex; justify-content: center; align-items: center; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image:hover { box-shadow: 0 0 0 2px var(--colorHighlightBg); }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image.preview img { object-fit: cover; width: 120px; height: 120px; flex: 0 0 auto; }`,
+    // CSS for custom file icons
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image.icon .file-icon { width: 54px; height: 69px; padding: 15px 0 0; position: relative; font-family: sans-serif; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image.icon .file-icon:before { position: absolute; content: ''; left: 0; top: 0; height: 15px; left: 0; background-color: var(--colorFileIconBg, #007bff); right: 15px; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image.icon .file-icon:after { position: absolute; content: ''; width: 0; height: 0; border-style: solid; border-width: 15.5px 0 0 15.5px; border-color: transparent transparent transparent var(--colorFileIconBgLighter, #66b0ff); top: 0; right: 0; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image.icon .file-icon .file-icon-content { background-color: var(--colorFileIconBg, #007bff); top: 15px; color: var(--colorFileIconFg, #fff); position: absolute; left: 0; bottom: 0; right: 0; padding: 24.75px 0.3em 0; font-size: 19.5px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }`,
+    // CSS for OS file icons
+    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image.file-icon-os {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 120px; /* Ensure it fits the container */
+      height: 120px; /* Ensure it fits the container */
+    }`,
+    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-image.file-icon-os img {
+      max-width: 96px; /* Adjust size of the icon as needed */
+      max-height: 96px; /* Adjust size of the icon as needed */
+      object-fit: contain;
+    }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title { width: 120px; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title .filename-container { display: flex; flex-direction: row; overflow: hidden; width: 120px; }`,
     `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title .filename-container .filename-text { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }`,
-    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title .filename-container .filename-extension { white-align-self: flex-end; white-space: nowrap; }`, // Adjusted for better alignment
+    `.${nameKey}.dialog-custom .dialog-content .selectbox-wrapper .selectbox-container .selectbox-title .filename-container .filename-extension { white-align-self: flex-end; white-space: nowrap; }`,
   ], nameKey);
 
   function inject(nameKey) {
@@ -440,7 +454,7 @@
       window.easyFiles = true;
     }
 
-    const fileDataStore = {}; // Use an object for better file data management
+    const fileDataStore = {};
 
     let fileInput = null;
     let elementClickedRect = null;
@@ -457,9 +471,6 @@
     }
 
     function getRect(element) {
-      // Simplified rect calculation, assuming Vivaldi's rendering handles overflows well
-      // The original logic was trying to clip based on overflow:hidden parents which can be expensive.
-      // For popups, the main concern is typically the viewport.
       const rect = element.getBoundingClientRect().toJSON();
       return rect;
     }
@@ -487,13 +498,11 @@
           attributes[attr.name] = attr.value;
         }
 
-        // Clear previous file data if any
         for (const key in fileDataStore) {
           delete fileDataStore[key];
         }
 
-        // Adjust elementClickedRect to be relative to the mouse pointer for consistent positioning
-        const currentClickedRect = { ...elementClickedRect }; // Create a copy
+        const currentClickedRect = { ...elementClickedRect };
         currentClickedRect.left = currentClickedRect.left - pointerPosition.x;
         currentClickedRect.top = currentClickedRect.top - pointerPosition.y;
         currentClickedRect.right = currentClickedRect.right - pointerPosition.x;
@@ -506,13 +515,12 @@
           type: nameKey,
           action: 'click',
           attributes,
-          elementClickedRect: currentClickedRect, // Corrected variable name
+          elementClickedRect: currentClickedRect,
         });
       }
     }
 
     function handleMouseDown(event) {
-      // Capture pointer position directly from mouse down, as it's the most accurate for click
       pointerPosition.x = event.clientX;
       pointerPosition.y = event.clientY;
     }
@@ -530,7 +538,6 @@
       if (info.type === nameKey) {
         switch (info.action) {
           case 'file':
-            // Store chunks by a unique ID to ensure correct reassembly
             if (!fileDataStore[info.file.fileId]) {
                 fileDataStore[info.file.fileId] = {};
             }
@@ -539,7 +546,6 @@
             const receivedChunks = Object.keys(fileDataStore[info.file.fileId]).length;
             if (receivedChunks === info.file.fileDataLength) {
               const dataTransfer = new DataTransfer();
-              // Sort chunks by index to ensure correct order
               const sortedBase64Chunks = Object.keys(fileDataStore[info.file.fileId])
                 .sort((a, b) => parseInt(a) - parseInt(b))
                 .map(key => fileDataStore[info.file.fileId][key]);
@@ -555,7 +561,7 @@
               ));
 
               changeFile(dataTransfer);
-              delete fileDataStore[info.file.fileId]; // Clean up after successful transfer
+              delete fileDataStore[info.file.fileId];
             }
             break;
           case 'picker':
@@ -571,39 +577,18 @@
       const handlePaste = (e) => {
         e.preventDefault();
         const items = [];
-        // isRealFile logic needs to be carefully considered if there are no direct file entries
-        let isRealFile = false; // Assume false unless a proper file entry is found
-
         for (const item of e.clipboardData.items) {
           const file = item.getAsFile();
-          const entry = item.webkitGetAsEntry(); // webkitGetAsEntry is deprecated/non-standard but present in some browsers
-
           if (file) {
-            if (entry && entry.isFile) { // Check if it's a real file system entry
-              items.push({
-                file,
-                isFile: true,
-                isRealFile: true,
-              });
-              isRealFile = true;
-            } else if (file.type.startsWith('image/')) { // Handle non-real file images (e.g., copied from screen)
-              items.push({
-                file,
-                isFile: true,
-                isRealFile: false, // Not a real file from disk
-              });
-            }
-            // else ignore other types for now, as per original logic
-          } else if (entry && entry.isDirectory) {
             items.push({
-              isDirectory: true,
+              file: file,
+              isFile: true,
             });
           }
         }
-        document.removeEventListener('paste', handlePaste); // Clean up
+        document.removeEventListener('paste', handlePaste);
         resolve({
           items,
-          isRealFile,
         });
       };
 
@@ -615,69 +600,45 @@
   async function readClipboard(accept) {
     const clipboardFiles = [];
     try {
-      const supportedImageTypes = [ // Pre-defined for better performance and clarity
-        { extension: 'png', mimeType: 'image/png' },
-        { extension: 'jpeg', mimeType: 'image/jpeg' },
-        { extension: 'jpg', mimeType: 'image/jpeg' },
-      ];
-
       const pasteData = await simulatePaste();
 
-      // Process clipboard items in parallel
       const processingPromises = pasteData.items.map(async (item) => {
         const file = item.file;
-        let checkType = false;
-        let effectiveSupportedType = null;
+        if (item.isFile && file) {
+            let blob = new Blob([file], { type: file.type });
 
-        if (item.isFile) {
-          if (item.isRealFile) {
-            checkType = gnoh.file.verifyAccept({ fileName: file.name, mimeType: file.type }, accept);
-          } else {
-            // For non-real files (e.g., images copied from screen), try to match supported image types
-            effectiveSupportedType = supportedImageTypes.find(s => gnoh.file.verifyAccept({ fileName: 'image.' + s.extension, mimeType: s.mimeType }, accept));
-            checkType = effectiveSupportedType && file.type === 'image/png'; // Original only checked for PNG
-          }
+            try {
+                const jpegBlob = await convertPngToJpeg(blob);
+                blob = jpegBlob;
+            } catch (e) {
+                console.warn("Failed to convert PNG to JPEG, proceeding with PNG:", e);
+            }
+
+            const arrayBuffer = await blob.arrayBuffer();
+            const compressedArrayBuffer = await gnoh.stream.compress(arrayBuffer);
+            const compressedBase64String = btoa(new Uint8Array(compressedArrayBuffer)
+                .reduce((data, byte) => data + String.fromCharCode(byte), ''));
+            const fileDataChunks = gnoh.array.chunks(compressedBase64String, chunkSize);
+
+            const clipboardFile = {
+                fileData: fileDataChunks,
+                fileDataLength: fileDataChunks.length,
+                mimeType: blob.type,
+                size: blob.size,
+                category: 'clipboard',
+                fileId: gnoh.uuid.generate(),
+                fileName: file.name || `clipboard_file.${gnoh.file.getFileExtension(blob.type) || 'bin'}`,
+            };
+
+            if (blob.type.startsWith('image/')) {
+                clipboardFile.previewUrl = await vivaldi.utilities.storeImage({
+                    data: arrayBuffer,
+                    mimeType: blob.type,
+                });
+            }
+            return clipboardFile;
         }
-
-        if (checkType && (!maxAllowedSize || file.size <= maxAllowedSize)) {
-          let blob = new Blob([file], { type: file.type });
-
-          if (!item.isRealFile && effectiveSupportedType?.mimeType === 'image/jpeg') {
-            blob = await convertPngToJpeg(blob);
-          }
-
-          const arrayBuffer = await blob.arrayBuffer();
-          // Perform compression and base64 encoding
-          const compressedArrayBuffer = await gnoh.stream.compress(arrayBuffer);
-          const compressedBase64String = btoa(new Uint8Array(compressedArrayBuffer)
-            .reduce((data, byte) => data + String.fromCharCode(byte), ''));
-          const fileDataChunks = gnoh.array.chunks(compressedBase64String, chunkSize);
-
-          const clipboardFile = {
-            fileData: fileDataChunks,
-            fileDataLength: fileDataChunks.length,
-            mimeType: blob.type,
-            size: blob.size,
-            category: 'clipboard',
-            fileId: gnoh.uuid.generate(), // Add a unique ID for message reassembly
-          };
-
-          if (item.isRealFile) {
-            clipboardFile.fileName = file.name;
-          } else {
-            clipboardFile.extension = effectiveSupportedType?.extension || 'png'; // Default to png if no specific type matched
-          }
-
-          // Generate preview URL if it's an image
-          if (blob.type.startsWith('image/')) {
-            clipboardFile.previewUrl = await vivaldi.utilities.storeImage({
-              data: arrayBuffer, // Use original arrayBuffer for preview
-              mimeType: blob.type,
-            });
-          }
-          return clipboardFile; // Return the processed file
-        }
-        return null; // Return null if not valid
+        return null;
       });
 
       const results = await Promise.allSettled(processingPromises);
@@ -685,7 +646,7 @@
         if (result.status === 'fulfilled' && result.value) {
           clipboardFiles.push(result.value);
         } else if (result.status === 'rejected') {
-          console.error("Failed to process clipboard item:", result.reason);
+          console.error("Error processing clipboard item:", result.reason);
         }
       });
 
@@ -713,7 +674,7 @@
           } else {
             reject(new Error("Failed to convert PNG to JPEG."));
           }
-        }, 'image/jpeg', 0.9); // Added quality parameter for JPEG conversion
+        }, 'image/jpeg', 0.9);
       };
       image.onerror = (e) => {
         URL.revokeObjectURL(image.src);
@@ -724,19 +685,15 @@
   }
 
   async function getDownloadedFiles(accept) {
-    const downloadedFiles = await chrome.downloads.search({ exists: true, state: 'complete', orderBy: ['-startTime'], limit: 20 }); // Limit downloads to improve speed initially
+    const downloadedFiles = await chrome.downloads.search({ exists: true, state: 'complete', orderBy: ['-startTime'], limit: 10 });
 
     const filePromises = downloadedFiles.map(async (downloadedFile) => {
       if (
         downloadedFile.mime
-        && downloadedFile.mime !== 'application/x-msdownload'
-        && gnoh.file.verifyAccept({ fileName: downloadedFile.filename, mimeType: downloadedFile.mime }, accept)
       ) {
-        // No need to re-search by ID, initial search provides enough info
         if (
           downloadedFile.exists === true
           && downloadedFile.state === 'complete'
-          && (!maxAllowedSize || downloadedFile.fileSize <= maxAllowedSize)
         ) {
           const file = {
             mimeType: downloadedFile.mime,
@@ -744,10 +701,9 @@
             fileName: downloadedFile.filename.replace(/^.*[\\/]/, ''),
             size: downloadedFile.fileSize,
             category: 'downloaded-file',
-            fileId: gnoh.uuid.generate(), // Add unique ID
+            fileId: gnoh.uuid.generate(),
           };
 
-          // Generate preview URL if it's an image
           if (file.mimeType.startsWith('image/')) {
             file.previewUrl = await vivaldi.utilities.storeImage({
               url: file.path,
@@ -763,8 +719,6 @@
     const validFiles = {};
     results.forEach(result => {
       if (result.status === 'fulfilled' && result.value) {
-        // Use filename as a key to avoid duplicates, but only if it's the intended behavior
-        // If unique files by full path are needed, use path as key. Assuming filename uniqueness for display.
         if (!validFiles[result.value.fileName]) {
           validFiles[result.value.fileName] = result.value;
         }
@@ -801,18 +755,15 @@
     return fileIcon;
   }
 
-  // createSelectbox is now synchronous, as it only creates DOM elements based on pre-processed file data
   function createSelectbox(sender, file, dialog) {
     const selectbox = gnoh.createElement('button', {
       title: `${file.fileName ? file.fileName + '\n' : ''}Size: ${gnoh.file.readableFileSize(file.size)}`,
       class: 'selectbox',
       events: {
-        async click(event) { // Click event remains async to handle file data retrieval
+        async click(event) {
           event.preventDefault();
           dialog.close();
 
-          // Only retrieve file data if it hasn't been done yet (e.g., for downloaded files)
-          // Clipboard files should already have fileData prepared by readClipboard
           if (file.category === 'downloaded-file' && !file.fileData) {
             try {
               const arrayBuffer = await vivaldi.mailPrivate.readFileToBuffer(file.path);
@@ -823,12 +774,10 @@
               file.fileDataLength = file.fileData.length;
             } catch (e) {
               console.error("Failed to read downloaded file:", e);
-              // Handle error, maybe re-open picker or show a message
               return;
             }
           }
 
-          // For clipboard files, generate filename if not already present
           if (file.category === 'clipboard' && !file.fileName) {
             const d = new Date();
             const year = d.getFullYear();
@@ -838,15 +787,14 @@
             const minute = d.getMinutes().toString().padStart(2, '0');
             const second = d.getSeconds().toString().padStart(2, '0');
             const millisecond = d.getMilliseconds().toString().padStart(3, '0');
-            file.fileName = `image_${year}-${month}-${date}_${hour}${minute}${second}${millisecond}.${file.extension}`;
+            const ext = gnoh.file.getFileExtension(file.mimeType) || gnoh.file.getFileExtension(file.fileName) || 'bin';
+            file.fileName = `clipboard_file_${year}-${month}-${date}_${hour}${minute}${second}${millisecond}.${ext}`;
           }
 
-          // Ensure file.fileData exists before choosing file
           if (file.fileData) {
             chooseFile(sender, file);
           } else {
             console.error("File data not available for selection.");
-            // Optionally, show a message to the user that the file could not be processed.
           }
         },
       },
@@ -861,11 +809,30 @@
       gnoh.createElement('img', {
         src: file.previewUrl,
       }, selectboxImage);
-    } else {
-      selectboxImage.classList.add('icon');
-      const extension = file.extension || gnoh.file.getFileExtension(file.fileName);
-      selectboxImage.append(createFileIcon(extension));
+    } else if (file.path) { // Only try to get OS icon if a path is available (i.e., for downloaded files)
+        const iconContainer = gnoh.createElement('div', {
+            class: 'file-icon-os'
+        }, selectboxImage);
+
+        vivaldi.files.getFileIcon(file.path, file.mimeType, (iconData) => {
+            if (iconData && iconData.data) {
+                gnoh.createElement('img', {
+                    src: iconData.data,
+                    alt: 'file icon'
+                }, iconContainer);
+            } else {
+                // Fallback to your custom text icon if native icon is not available or path is missing
+                selectboxImage.classList.add('icon');
+                const extension = gnoh.file.getFileExtension(file.fileName || file.mimeType) || 'file';
+                selectboxImage.append(createFileIcon(extension));
+            }
+        });
+    } else { // Fallback for clipboard files without a path
+        selectboxImage.classList.add('icon');
+        const extension = gnoh.file.getFileExtension(file.fileName || file.mimeType) || 'file';
+        selectboxImage.append(createFileIcon(extension));
     }
+
 
     const selectboxTitle = gnoh.createElement('div', {
       class: 'selectbox-title',
@@ -876,7 +843,7 @@
     }, selectboxTitle);
 
     if (file.fileName) {
-      const extension = file.extension || gnoh.file.getFileExtension(file.fileName);
+      const extension = gnoh.file.getFileExtension(file.fileName);
       const name = extension ? file.fileName.substring(0, file.fileName.length - extension.length - 1) : file.fileName;
 
       gnoh.createElement('div', {
@@ -907,6 +874,8 @@
     });
 
     const buttonCancelElement = gnoh.object.merge(gnoh.constant.dialogButtons.cancel, {
+      label: gnoh.i18n.getMessage('Cancel'),
+      cancel: true,
       click() {
         disconnectResizeObserver && disconnectResizeObserver();
       },
@@ -920,7 +889,7 @@
         class: nameKey,
       }
     );
-    dialog.dialog.style.maxWidth = 570 + 'px';
+    dialog.dialog.style.maxWidth = '90vw';
 
     dialog.modalBg.style.height = 'fit-content';
     dialog.modalBg.style.position = 'fixed';
@@ -935,11 +904,9 @@
       for (const entry of entries) {
         const dialogRect = entry.contentRect;
 
-        // Position dialog relative to the clicked element, accounting for viewport boundaries
         let newLeft = info.elementClickedRect.left;
-        let newTop = info.elementClickedRect.bottom; // Default to below clicked element
+        let newTop = info.elementClickedRect.bottom;
 
-        // Adjust horizontally
         if (newLeft + dialogRect.width > window.innerWidth) {
           newLeft = Math.max(0, info.elementClickedRect.right - dialogRect.width);
         }
@@ -947,9 +914,8 @@
           newLeft = 0;
         }
 
-        // Adjust vertically
         if (newTop + dialogRect.height > window.innerHeight) {
-          newTop = Math.max(0, info.elementClickedRect.top - dialogRect.height); // Try above if not enough space below
+          newTop = Math.max(0, info.elementClickedRect.top - dialogRect.height);
         }
         if (newTop < 0) {
           newTop = 0;
@@ -965,7 +931,6 @@
     disconnectResizeObserver = () => resizeObserver.unobserve(dialog.dialog);
 
 
-    // Optimization: Create a DocumentFragment to append all selectboxes in one go
     const fragment = document.createDocumentFragment();
 
     if (clipboardFiles.length) {
@@ -1005,7 +970,6 @@
       });
       fragment.append(selectboxWrapperDownloaded);
     }
-    // Append the fragment to the dialog content once
     dialog.dialogContent.append(fragment);
   }
 
@@ -1021,7 +985,6 @@
   }
 
   function chooseFile(sender, file) {
-    // Ensure fileData is an array and not empty
     if (!file.fileData || file.fileData.length === 0) {
       console.error("Attempted to send empty or non-existent file data.");
       return;
@@ -1039,7 +1002,7 @@
           fileDataLength: file.fileData.length,
           fileName: file.fileName,
           mimeType: file.mimeType,
-          fileId: file.fileId, // Pass the unique file ID
+          fileId: file.fileId,
         },
       }, {
         frameId: sender.frameId,
@@ -1047,14 +1010,12 @@
     }
   }
 
-  // Refined handling for pointer position
   vivaldi.tabsPrivate.onWebviewClickCheck.addListener((windowId, mousedown, button, clientX, clientY) => {
     if (
       windowId === vivaldiWindowId
       && mousedown
       && button === 0
     ) {
-      // Update pointerPosition only on mousedown, not just click
       pointerPosition.x = clientX;
       pointerPosition.y = clientY;
     }
@@ -1067,7 +1028,6 @@
     ) {
       switch (info.action) {
         case 'click':
-          // Parallelize the fetching and processing of clipboard and downloaded files
           const [clipboardFilesResult, downloadedFilesResult] = await Promise.allSettled([
             readClipboard(info.attributes.accept),
             getDownloadedFiles(info.attributes.accept),
@@ -1089,7 +1049,7 @@
             let zoom = 1;
             let webviewZoom = 1;
 
-            if (webview) { // Ensure webview exists before trying to get zoom
+            if (webview) {
               try {
                   zoom = parseFloat(gnoh.element.getStyle(webview).getPropertyValue('--uiZoomLevel')) || 1;
                   webviewZoom = await new Promise((resolve) => {
@@ -1105,7 +1065,6 @@
 
             const ratio = webviewZoom / zoom;
 
-            // Apply zoom ratio to the clicked element's rect
             info.elementClickedRect.left = info.elementClickedRect.left * ratio + pointerPosition.x;
             info.elementClickedRect.top = info.elementClickedRect.top * ratio + pointerPosition.y;
             info.elementClickedRect.right = info.elementClickedRect.right * ratio + pointerPosition.x;
@@ -1122,7 +1081,6 @@
               downloadedFiles,
             })
           } else {
-            // If no easy files, fall back to default picker
             showAllFiles(sender);
           }
           break;
@@ -1130,9 +1088,7 @@
     }
   });
 
-  // Simplified and more robust injection logic
   gnoh.timeOut(() => {
-    // Inject into existing tabs
     chrome.tabs.query({ windowId: window.vivaldiWindowId, windowType: 'normal' }, (tabs) => {
       tabs.forEach((tab) => {
         chrome.scripting.executeScript({
@@ -1146,10 +1102,8 @@
       });
     });
 
-    // Inject into new frames/pages as they load
     chrome.webNavigation.onCommitted.addListener((details) => {
-      // Only inject if it's a new page load (not just a fragment navigation)
-      if (details.tabId !== -1 && (details.frameId === 0 || details.url.startsWith('http'))) { // frameId 0 is the main frame
+      if (details.tabId !== -1 && (details.frameId === 0 || details.url.startsWith('http'))) {
         chrome.scripting.executeScript({
           target: {
             tabId: details.tabId,
